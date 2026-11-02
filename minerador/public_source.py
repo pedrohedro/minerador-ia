@@ -18,7 +18,8 @@ import httpx
 from . import btc, p2p
 from .job import Job, build_job
 
-API = "https://mempool.space/api"
+APIS = ["https://mempool.space/api", "https://blockstream.info/api"]
+API = APIS[0]
 POLL_SECONDS = 20
 REBUILD_SECONDS = 90
 BLOCK_VERSION = 0x20000000
@@ -41,21 +42,48 @@ class PublicSource:
         self.error: str | None = None
         self.tip: dict = {}
         self._http = httpx.Client(timeout=20, headers={"User-Agent": "MineradorIA/1.0"})
+        self._api_index = 0
         self._candidates: dict[str, dict] = {}     # txid -> dados da transação
         self._rejected: set[str] = set()
         self._confirmed_parents: set[str] = set()
         self._wake = threading.Event()
 
     # ---- HTTP ----
+    @property
+    def active_api(self) -> str:
+        return APIS[self._api_index]
+
     def _get(self, path: str, as_json: bool = True):
-        for attempt in range(3):
-            r = self._http.get(API + path)
-            if r.status_code == 429:
-                time.sleep(2 + attempt * 3)
-                continue
-            r.raise_for_status()
-            return r.json() if as_json else r.text
-        r.raise_for_status()
+        last_exc: Exception | None = None
+        for _rotation in range(len(APIS)):
+            base = APIS[self._api_index]
+            url = base + path
+            for attempt in range(3):
+                try:
+                    r = self._http.get(url)
+                    if r.status_code == 429:
+                        time.sleep(2 + attempt * 3)
+                        if attempt == 2:
+                            # exhausted retries on this API — rotate
+                            raise httpx.HTTPStatusError(
+                                "429 Too Many Requests", request=r.request, response=r
+                            )
+                        continue
+                    r.raise_for_status()
+                    return r.json() if as_json else r.text
+                except (httpx.HTTPStatusError, httpx.ConnectError, httpx.ConnectTimeout,
+                        httpx.ReadTimeout, httpx.RemoteProtocolError) as exc:
+                    last_exc = exc
+                    if isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code == 429 \
+                            and attempt < 2:
+                        # already handled by the sleep+continue above; this path means attempt==2
+                        pass
+                    # rotate immediately for non-429, or after exhausting retries for 429
+                    break
+            # rotate to next API
+            self._api_index = (self._api_index + 1) % len(APIS)
+            self.log(f"Tentando API alternativa: {APIS[self._api_index]}", "info")
+        raise last_exc
 
     # ---- ciclo de vida ----
     def start(self) -> None:
@@ -81,7 +109,7 @@ class PublicSource:
                     self.refresh(tip_hash, new_block=tip_hash != last_tip)
                     last_tip, last_build = tip_hash, time.time()
                 if not self.connected:
-                    self.log("Conectado aos dados públicos da rede (mempool.space).", "ok")
+                    self.log(f"Conectado aos dados públicos da rede ({APIS[self._api_index]}).", "ok")
                 self.connected, self.error = True, None
             except Exception as e:  # noqa: BLE001
                 msg = f"{e.__class__.__name__}: {e}"
@@ -192,4 +220,5 @@ class PublicSource:
             "rede": "main",
             "altura_topo": self.tip.get("height"),
             "transacoes_candidatas": len(self._candidates),
+            "api_ativa": APIS[self._api_index],
         }
