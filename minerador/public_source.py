@@ -55,8 +55,12 @@ class PublicSource:
 
     def _get(self, path: str, as_json: bool = True):
         last_exc: Exception | None = None
-        for _rotation in range(len(APIS)):
-            base = APIS[self._api_index]
+        # Always start from index 0 so the primary API is preferred on every call.
+        # This ensures the miner returns to mempool.space automatically after recovery.
+        start_index = 0
+        for rotation in range(len(APIS)):
+            idx = (start_index + rotation) % len(APIS)
+            base = APIS[idx]
             url = base + path
             for attempt in range(3):
                 try:
@@ -70,6 +74,8 @@ class PublicSource:
                             )
                         continue
                     r.raise_for_status()
+                    # Record the index of the API that succeeded so status() is accurate.
+                    self._api_index = idx
                     return r.json() if as_json else r.text
                 except (httpx.HTTPStatusError, httpx.ConnectError, httpx.ConnectTimeout,
                         httpx.ReadTimeout, httpx.RemoteProtocolError) as exc:
@@ -80,9 +86,8 @@ class PublicSource:
                         pass
                     # rotate immediately for non-429, or after exhausting retries for 429
                     break
-            # rotate to next API
-            self._api_index = (self._api_index + 1) % len(APIS)
-            self.log(f"Tentando API alternativa: {APIS[self._api_index]}", "info")
+            if rotation < len(APIS) - 1:
+                self.log(f"Tentando API alternativa: {APIS[(start_index + rotation + 1) % len(APIS)]}", "info")
         raise last_exc
 
     # ---- ciclo de vida ----
@@ -109,7 +114,7 @@ class PublicSource:
                     self.refresh(tip_hash, new_block=tip_hash != last_tip)
                     last_tip, last_build = tip_hash, time.time()
                 if not self.connected:
-                    self.log(f"Conectado aos dados públicos da rede ({APIS[self._api_index]}).", "ok")
+                    self.log(f"Conectado aos dados públicos da rede ({self.active_api}).", "ok")
                 self.connected, self.error = True, None
             except Exception as e:  # noqa: BLE001
                 msg = f"{e.__class__.__name__}: {e}"
@@ -154,8 +159,9 @@ class PublicSource:
                     del self._candidates[txid]
         try:
             recent = self._get("/mempool/recent")
-        except httpx.HTTPError:
-            recent = []
+        except (httpx.HTTPError, httpx.HTTPStatusError):
+            # Total outage: propagate so _loop can mark the source as disconnected.
+            raise
         for item in recent:
             txid = item["txid"]
             if txid in self._candidates or txid in self._rejected:
