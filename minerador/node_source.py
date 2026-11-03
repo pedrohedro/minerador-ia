@@ -107,7 +107,7 @@ class NodeSource:
             return {"ok": False, "motivo": str(e)}
         self._wake.set()     # pede um template novo imediatamente
         if result is None:
-            return {"ok": True, "detalhe": "o nó aceitou o bloco"}
+            return {"ok": True, "confirmado": True, "detalhe": "o nó aceitou o bloco"}
         return {"ok": False, "motivo": result}
 
     def status(self) -> dict:

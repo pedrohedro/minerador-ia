@@ -12,6 +12,7 @@ import httpx
 
 from . import btc, regtest
 from .ai import PROVIDERS, Copilot
+from .hasher import Hasher
 from .job import EXTRANONCE_SIZE, Job
 from .node_source import NodeSource
 from .paths import CONFIG_FILE, FOUND_FILE
@@ -26,7 +27,7 @@ DEFAULT_CONFIG = {
     "envio_automatico": True,
     "no": {"host": "127.0.0.1", "porta": 8332, "usuario": "", "senha": "", "cookie": ""},
     "ia": {
-        "provedor": "xai",
+        "provedor": "openrouter",
         "chaves": {p: "" for p in PROVIDERS},
         "modelos": {p: v["modelo"] for p, v in PROVIDERS.items()},
         "base_url_compat": "",
@@ -64,6 +65,7 @@ class Controller:
         self.checked_total = 0
         self.regtest = regtest.RegtestNode()
         self.copilot = Copilot(self)
+        self.hasher = Hasher(self)
         self.network: dict = {}
         self._network_at = 0.0
         self._http = httpx.Client(timeout=20, headers={"User-Agent": "MineradorIA/1.0"})
@@ -238,8 +240,9 @@ class Controller:
         if job.source != "regtest" and job.info.get("script_recompensa") != \
                 (self._payout_script() or b"").hex():
             return                       # montado com o endereço antigo: descarta
-        previous = self.current_job
-        self.current_job = job
+        with self.lock:
+            previous = self.current_job
+            self.current_job = job
         if previous is None or previous.height != job.height:
             self.log(f"Novo bloco candidato: altura {job.height}, {1 + len(job.tx_raw)} transações, "
                      f"recompensa {job.info['recompensa_total'] / btc.COIN:.8f} BTC")
@@ -262,6 +265,8 @@ class Controller:
 
     def submit(self, job: Job, extranonce: bytes, nonce: int, ntime: int | None, origin: str) -> dict:
         with self.lock:
+            if self.current_job is not job:
+                return {"ok": False, "motivo": "candidato antigo: a rede já avançou"}
             if job.job_id in self.solved_jobs:
                 return {"ok": False, "motivo": "este bloco candidato já foi resolvido e enviado"}
             check = job.check(nonce, extranonce, ntime)
@@ -413,6 +418,7 @@ class Controller:
             "bloco": {k: v for k, v in job.summary().items() if k != "transacoes"} if job else None,
             "chance": self.chance(),
             "testados": self.checked_total,
+            "hashing": self.hasher.status(),
             "ia": self.copilot.status(),
             "encontrados": [{k: v for k, v in f.items() if k != "bloco_hex"} for f in self.found[:20]],
             "eventos": list(self.events)[:80],
@@ -425,6 +431,7 @@ class Controller:
         return self.current_job.summary() if self.current_job else None
 
     def shutdown(self) -> None:
+        self.hasher.shutdown()
         self.disconnect(quiet=True)
         if self.regtest.proc:
             self.regtest.stop()

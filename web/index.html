@@ -41,6 +41,7 @@
     <div class="tile"><span>Altura do bloco candidato</span><b id="tHeight">—</b><em id="tHeightSub">aguardando conexão</em></div>
     <div class="tile"><span>Dificuldade da rede</span><b id="tDiff">—</b><em id="tDiffSub">&nbsp;</em></div>
     <div class="tile"><span>Palpites testados pela IA</span><b id="tGuesses">0</b><em id="tGuessesSub">&nbsp;</em></div>
+    <div class="tile"><span>Hashing contínuo</span><b id="tHashrate">—</b><em id="tHashrateSub">aguardando candidato</em></div>
     <div class="tile"><span>Melhor palpite</span><b id="tBest">—</b><em id="tBestSub">zeros no início do hash</em></div>
     <div class="tile tokens"><span>Tokens gastos com a IA</span><b id="tTokens">0</b><em id="tTokensSub">nenhuma chamada ainda</em><em id="tTokensSub2"></em></div>
   </div>
@@ -125,7 +126,7 @@
         <input type="radio" name="modo" value="publico">
         <div>
           <b>Mainnet solo, sem nó <span class="tag">recomendado</span></b>
-          <p>O bloco é montado com dados públicos da rede (mempool.space). Se a IA acertar, o bloco é transmitido direto para os nós do Bitcoin pelo protocolo P2P. Nada de pool, nada de nó, nada de mineração pesada no PC.</p>
+          <p>O bloco é montado com dados públicos da rede (mempool.space). Dois trabalhadores locais testam hashes continuamente; a IA testa palpites adicionais. Um bloco válido é transmitido aos nós pelo protocolo P2P. O cálculo contínuo usa CPU.</p>
         </div>
       </label>
       <label class="mode">

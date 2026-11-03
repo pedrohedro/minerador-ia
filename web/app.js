@@ -506,14 +506,16 @@ function render() {
   $("tDiffSub").textContent = b ? `o hash precisa começar com ${b.zeros_necessarios} bits zero` : " ";
   $("tGuesses").textContent = fmtInt(ia.ia.total);
   $("tGuessesSub").textContent = `+ ${fmtInt(ia.aleatorio.total)} aleatórios para comparar`;
+  $("tHashrate").textContent = s.hashing?.trabalhadores ? `${fmtInt(s.hashing.hashes_por_segundo)} H/s` : "—";
+  $("tHashrateSub").textContent = `${fmtInt(s.hashing?.hashes || 0)} hashes · ${s.hashing?.trabalhadores || 0} trabalhadores`;
   const best = ia.ia.melhor;
   $("tBest").textContent = best ? `${best.zeros_bits} bits` : "—";
   $("tBestSub").textContent = b ? `de ${b.zeros_necessarios} necessários para fechar o bloco` : "zeros no início do hash";
 
   // IA
   const badge = $("aiBadge");
-  badge.textContent = ia.rodando ? "calculando nonces" : "parada";
-  badge.className = `badge ${ia.rodando ? "on" : ""} ${ia.ultimo_erro ? "err" : ""}`;
+  badge.textContent = ia.solicitacao_em_andamento ? "aguardando modelo" : ia.rodando ? "ativa" : "parada";
+  badge.className = `badge ${ia.rodando && !ia.ultimo_erro ? "on" : ""} ${ia.ultimo_erro ? "err" : ""}`;
   $("aiModelLine").textContent = `${CFG?.provedores?.[ia.provedor] || ia.provedor} · modelo ${ia.modelo || "—"}`;
   $("aiCalls").textContent = `${fmtInt(ia.chamadas)} de ${fmtInt(ia.limite_chamadas)}`;
   const ses = ia.tokens_sessao, tot = ia.tokens_total;
@@ -543,8 +545,9 @@ function render() {
     const p = s.chance.por_palpite;
     $("oddsEach").textContent = p >= 0.01 ? `${(p * 100).toFixed(0)}%` : `1 em ${fmtBig(1 / p)}`;
     $("oddsNeeded").textContent = fmtBig(s.chance.palpites_esperados);
-    const perSec = 1 / ((CFG?.ia?.intervalo ?? 5) + (ia.tempo_medio_chamada ?? 2));
-    $("oddsTime").textContent = fmtDuration(s.chance.palpites_esperados / perSec);
+    const perSec = (s.hashing?.hashes_por_segundo || 0) +
+      (ia.rodando ? 1 / ((CFG?.ia?.intervalo ?? 5) + (ia.tempo_medio_chamada ?? 2)) : 0);
+    $("oddsTime").textContent = perSec > 0 ? fmtDuration(s.chance.palpites_esperados / perSec) : "—";
     const need = b.zeros_necessarios, got = best ? best.zeros_bits : 0;
     $("zmBest").style.width = `${Math.min(100, (got / Math.max(need, 1)) * 100)}%`;
     $("zmText").textContent = `${got} de ${need} bits`;
@@ -587,7 +590,7 @@ function render() {
   $("foundTable").querySelector("tbody").innerHTML = s.encontrados.length
     ? s.encontrados.map((f) => `<tr><td>${fmtDate(f.quando)}</td><td>${esc(f.rede)}</td><td>${fmtInt(f.altura)}</td><td>${esc(f.origem)}</td>
         <td class="mono">${hashHtml(f.hash)}</td><td>${fmtBTC(f.recompensa)}</td>
-        <td class="${f.resultado.ok ? "ok-text" : "bad-text"}">${f.resultado.ok ? "✓ " + esc(f.resultado.detalhe || "enviado") : "✗ " + esc(f.resultado.motivo)}</td></tr>`).join("")
+        <td class="${f.resultado.confirmado ? "ok-text" : f.resultado.ok ? "" : "bad-text"}">${f.resultado.confirmado ? "✓ " : f.resultado.ok ? "↗ " : "✗ "}${esc(f.resultado.ok ? (f.resultado.detalhe || "transmitido; aceitação não confirmada") : f.resultado.motivo)}</td></tr>`).join("")
     : '<tr><td colspan="7" class="muted">Nenhum bloco enviado ainda.</td></tr>';
 
   // regtest
