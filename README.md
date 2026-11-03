@@ -1,12 +1,12 @@
 # Minerador IA
 
-Minerador solo de Bitcoin com hashing contínuo local e palpites adicionais de IA. O programa monta blocos, testa nonces com SHA-256 duplo e transmite um bloco válido à rede. O modo público não exige nó próprio. O hashing contínuo usa dois núcleos da CPU; a IA não melhora a chance por tentativa.
+Minerador solo de Bitcoin com hashing contínuo local e palpites adicionais de IA. O programa monta blocos, testa nonces com SHA-256 duplo e transmite um bloco válido à rede. O modo público não exige nó próprio. O hashing contínuo usa dois núcleos da CPU por padrão; a IA não melhora a chance por tentativa.
 
 > **Isto é um projeto educacional, não uma forma de ganhar dinheiro.** O SHA-256 não tem padrão, então o nonce da IA vale o mesmo que um número sorteado. Em 31/10/2026, a chance na mainnet era de cerca de **1 em 637 sextilhões por tentativa**, e cada chamada à IA é cobrada pelo provedor. Para ver um bloco ser aceito de verdade, sem gastar nada, use o [teste no regtest](#3-teste-sem-gastar-nada).
 
 ## Melhorias deste fork
 
-- Hashing local contínuo com dois trabalhadores e espaços de nonce separados, em paralelo aos palpites da IA.
+- Hashing local contínuo com trabalhadores e espaços de nonce separados, em paralelo aos palpites da IA. A opção de horário usa todos os núcleos disponíveis das 20h às 9h e dois no restante do dia (horário de São Paulo).
 - Taxa real de hashes por segundo e total calculado no painel; estimativa de tempo baseada nesse ritmo.
 - OpenRouter com respostas curtas e limite de espera para descartar palpites que chegam depois da troca de bloco.
 - Fonte pública alternativa em caso de falha da API principal, com estado de conexão atualizado.
@@ -45,7 +45,7 @@ python3 -m venv .venv
 
 **Passo 3: cadastre o endereço da carteira.** Na aba **Carteira & Rede**, cole o seu endereço público (`bc1…`, `1…` ou `3…`) e clique em **Salvar endereço**. Nunca digite a frase de recuperação (seed) nem a chave privada.
 
-**Passo 4: conecte.** Deixe o modo **Mainnet solo, sem nó** e clique em **Salvar e conectar**. O bloco candidato aparece no **Painel** em poucos segundos e dois trabalhadores locais começam a calcular hashes continuamente. Desconectar encerra esse cálculo.
+**Passo 4: conecte.** Deixe o modo **Mainnet solo, sem nó** e clique em **Salvar e conectar**. O bloco candidato aparece no **Painel** em poucos segundos e dois trabalhadores locais começam a calcular hashes continuamente. Na aba **Carteira & Rede**, você pode ativar o uso de todos os núcleos das 20h às 9h. Desconectar encerra o cálculo.
 
 **Passo 5: configure a IA.** Na aba **Inteligência Artificial**, escolha o provedor, cole a chave, clique em **Listar modelos** e escolha um modelo. Defina um **limite de chamadas** baixo para controlar o gasto e clique em **Salvar**.
 

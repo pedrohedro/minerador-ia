@@ -3,20 +3,31 @@ from __future__ import annotations
 
 import hashlib
 import multiprocessing as mp
+import os
 import queue
 import struct
 import threading
 import time
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from . import btc
 
-WORKERS = 2
+DAY_WORKERS = 2
+TIMEZONE = ZoneInfo("America/Sao_Paulo")
 BATCH = 8192
 
 
-def _worker(job, index: int, count: int, stop, reports) -> None:
+def worker_schedule(enabled: bool, now: datetime | None = None) -> tuple[int, str]:
+    hour = (now or datetime.now(TIMEZONE)).astimezone(TIMEZONE).hour
+    night = hour >= 20 or hour < 9
+    return (max(DAY_WORKERS, os.cpu_count() or DAY_WORKERS) if enabled and night
+            else DAY_WORKERS), ("noite" if night else "dia")
+
+
+def _worker(job, index: int, count: int, generation: int, stop, reports) -> None:
     # A IA usa extra nonce zero; cada processo usa um valor distinto.
-    extra = (index + 1).to_bytes(8, "little")
+    extra = ((generation << 32) + index + 1).to_bytes(8, "little")
     prefix = job.header(extra, 0)[:76]
     first = hashlib.sha256(prefix)
     target = job.target
@@ -49,6 +60,8 @@ class Hasher:
         self.stop_event = None
         self.reports = None
         self.job_id = None
+        self.worker_count = 0
+        self.generation = 0
         self.total = 0
         self.started = time.monotonic()
         self.last_count = 0
@@ -65,34 +78,38 @@ class Hasher:
                 process.terminate()
                 process.join(timeout=0.5)
         self.processes = []
+        self.worker_count = 0
         if self.reports:
             self.reports.close()
         self.reports = None
         self.stop_event = None
 
-    def _start_workers(self, job) -> None:
+    def _start_workers(self, job, count: int) -> None:
+        self.generation += 1
+        self.worker_count = count
         self.stop_event = self.ctx.Event()
         self.reports = self.ctx.Queue()
         self.processes = [self.ctx.Process(target=_worker,
-                          args=(job, i, WORKERS, self.stop_event, self.reports), daemon=True)
-                          for i in range(WORKERS)]
+                          args=(job, i, count, self.generation, self.stop_event, self.reports), daemon=True)
+                          for i in range(count)]
         for process in self.processes:
             process.start()
-        self.ctrl.log(f"Hashing contínuo iniciado: {WORKERS} trabalhadores na altura {job.height}.")
+        self.ctrl.log(f"Hashing contínuo iniciado: {count} trabalhadores na altura {job.height}.")
 
     def _loop(self) -> None:
         while not self._quit.is_set():
             job = self.ctrl.current_job if self.ctrl.source and self.ctrl.source.connected else None
             job_id = job.job_id if job and job.job_id not in self.ctrl.solved_jobs else None
-            if job_id != self.job_id:
+            desired, _ = worker_schedule(self.ctrl.config.get("hashing_noturno", False))
+            if job_id != self.job_id or (job_id and desired != self.worker_count):
                 self._stop_workers()
                 self.job_id = job_id
                 if job:
-                    self._start_workers(job)
+                    self._start_workers(job, desired)
             elif job_id and self.processes and not any(p.is_alive() for p in self.processes):
                 # Um achado transmitido pode ser recusado; retome a busca nesse caso.
                 self._stop_workers()
-                self._start_workers(job)
+                self._start_workers(job, desired)
             if self.reports:
                 try:
                     item = self.reports.get(timeout=0.25)
@@ -116,9 +133,11 @@ class Hasher:
         self._stop_workers()
 
     def status(self) -> dict:
+        desired, period = worker_schedule(self.ctrl.config.get("hashing_noturno", False))
         return {"trabalhadores": sum(p.is_alive() for p in self.processes),
                 "hashes": self.total, "hashes_por_segundo": round(self.rate, 1),
-                "altura_ativa": self.ctrl.current_job.height if self.job_id and self.ctrl.current_job else None}
+                "altura_ativa": self.ctrl.current_job.height if self.job_id and self.ctrl.current_job else None,
+                "trabalhadores_programados": desired, "periodo": period}
 
     def shutdown(self) -> None:
         self._quit.set()
