@@ -91,6 +91,7 @@ async function loadConfig() {
   $("inIncludeTxs").checked = CFG.incluir_transacoes;
   $("inMaxTxs").value = CFG.max_transacoes;
   $("inAutoSend").checked = CFG.envio_automatico;
+  $("inNightHashing").checked = CFG.hashing_noturno;
   $("inNodeHost").value = CFG.no.host;
   $("inNodePort").value = CFG.no.porta;
   $("inNodeUser").value = CFG.no.usuario;
@@ -135,6 +136,7 @@ function modeBody() {
     incluir_transacoes: $("inIncludeTxs").checked,
     max_transacoes: Number($("inMaxTxs").value || 0),
     envio_automatico: $("inAutoSend").checked,
+    hashing_noturno: $("inNightHashing").checked,
     no: { host: $("inNodeHost").value, porta: Number($("inNodePort").value || 8332),
       usuario: $("inNodeUser").value, cookie: $("inNodeCookie").value },
   };
@@ -507,7 +509,7 @@ function render() {
   $("tGuesses").textContent = fmtInt(ia.ia.total);
   $("tGuessesSub").textContent = `+ ${fmtInt(ia.aleatorio.total)} aleatórios para comparar`;
   $("tHashrate").textContent = s.hashing?.trabalhadores ? `${fmtInt(s.hashing.hashes_por_segundo)} H/s` : "—";
-  $("tHashrateSub").textContent = `${fmtInt(s.hashing?.hashes || 0)} hashes · ${s.hashing?.trabalhadores || 0} trabalhadores`;
+  $("tHashrateSub").textContent = `${fmtInt(s.hashing?.hashes || 0)} hashes · ${s.hashing?.trabalhadores || 0} trabalhadores (programados: ${s.hashing?.trabalhadores_programados || 2})`;
   const best = ia.ia.melhor;
   $("tBest").textContent = best ? `${best.zeros_bits} bits` : "—";
   $("tBestSub").textContent = b ? `de ${b.zeros_necessarios} necessários para fechar o bloco` : "zeros no início do hash";

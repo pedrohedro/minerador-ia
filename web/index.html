@@ -126,7 +126,7 @@
         <input type="radio" name="modo" value="publico">
         <div>
           <b>Mainnet solo, sem nó <span class="tag">recomendado</span></b>
-          <p>O bloco é montado com dados públicos da rede (mempool.space). Dois trabalhadores locais testam hashes continuamente; a IA testa palpites adicionais. Um bloco válido é transmitido aos nós pelo protocolo P2P. O cálculo contínuo usa CPU.</p>
+          <p>O bloco é montado com dados públicos da rede (mempool.space). Trabalhadores locais testam hashes continuamente; a IA testa palpites adicionais. Um bloco válido é transmitido aos nós pelo protocolo P2P. O cálculo contínuo usa CPU.</p>
         </div>
       </label>
       <label class="mode">
@@ -149,6 +149,7 @@
       <label class="switch"><input type="checkbox" id="inIncludeTxs"><span></span>Incluir transações da mempool no bloco (ganha as taxas)</label>
       <label class="field inline"><span>Máximo de transações</span><input id="inMaxTxs" type="number" min="0" max="500"></label>
       <label class="switch"><input type="checkbox" id="inAutoSend"><span></span>Transmitir o bloco automaticamente quando um nonce válido for encontrado</label>
+      <label class="switch"><input type="checkbox" id="inNightHashing"><span></span>Das 20h às 9h, usar todos os núcleos disponíveis (horário de São Paulo); no restante do dia, usar 2</label>
     </div>
 
     <div id="nodeBox" class="subbox" hidden>

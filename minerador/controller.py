@@ -25,6 +25,7 @@ DEFAULT_CONFIG = {
     "incluir_transacoes": True,
     "max_transacoes": 25,
     "envio_automatico": True,
+    "hashing_noturno": False,
     "no": {"host": "127.0.0.1", "porta": 8332, "usuario": "", "senha": "", "cookie": ""},
     "ia": {
         "provedor": "openrouter",
@@ -134,7 +135,7 @@ class Controller:
                 new["endereco"] = addr
             if data.get("modo") in MODES:
                 new["modo"] = data["modo"]
-            for key in ("incluir_transacoes", "envio_automatico"):
+            for key in ("incluir_transacoes", "envio_automatico", "hashing_noturno"):
                 if key in data:
                     new[key] = bool(data[key])
             if "max_transacoes" in data:
