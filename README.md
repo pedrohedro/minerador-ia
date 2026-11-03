@@ -14,6 +14,30 @@ Minerador solo de Bitcoin com hashing contínuo local e palpites adicionais de I
 
 O modo público ainda não confirma sozinho a aceitação de um bloco pela rede. Para montar candidatos com um nó próprio e obter o resultado de `submitblock`, use o modo **Mainnet com nó próprio**.
 
+## ThinkPad dedicado: Windows → Debian 13 → nó Bitcoin Core
+
+**A instalação do Debian apaga o Windows e todos os dados do SSD escolhido.** Faça backup antes. O ThinkPad deve estar ligado à internet; um cabo de rede facilita a instalação e a sincronização inicial.
+
+1. No PowerShell do **ThinkPad ainda com Windows**, baixe e execute [o preparador](scripts/preparar-debian-thinkpad.ps1). Ele baixa a ISO oficial, confere SHA-512 e cria `PASSOS.txt` na pasta Downloads. **Não apaga discos.**
+
+   ```powershell
+   Invoke-WebRequest https://raw.githubusercontent.com/pedrohedro/minerador-ia/main/scripts/preparar-debian-thinkpad.ps1 -OutFile "$env:USERPROFILE\Downloads\preparar-debian-thinkpad.ps1"
+   powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\Downloads\preparar-debian-thinkpad.ps1"
+   ```
+
+2. Siga `PASSOS.txt`: grave a ISO num pendrive com [Rufus](https://rufus.ie/), inicie o ThinkPad por ele e, no instalador Debian, escolha **usar o disco inteiro**. Confira que o disco selecionado é o **SSD interno de aproximadamente 1 TB** antes de confirmar. A instalação por pendrive é necessária porque o Windows em execução não pode apagar o próprio disco do sistema.
+3. No Debian instalado, execute [o configurador do nó](scripts/setup-bitcoin-node-debian.sh):
+
+   ```bash
+   curl -fsSLO https://raw.githubusercontent.com/pedrohedro/minerador-ia/main/scripts/setup-bitcoin-node-debian.sh
+   sudo bash setup-bitcoin-node-debian.sh
+   ```
+
+   O configurador instala Bitcoin Core 32.1 com checksum fixo, configura a mainnet com poda de 100 GiB, cria um serviço que inicia automaticamente e limita a API RPC ao próprio ThinkPad. Ele não formata discos. A sincronização inicial pode levar dias e baixar centenas de GB, mesmo com poda.
+4. Leia `~/bitcoin-rpc-credentials.txt` no ThinkPad; mantenha a senha privada. No Mac, abra o túnel SSH indicado no arquivo. No Minerador IA, escolha **Mainnet com nó próprio**, host `127.0.0.1`, porta `18332`, usuário `minerador` e a senha do arquivo. Conecte após o Bitcoin Core mostrar `initialblockdownload=false`.
+
+O nó é dedicado à validação e transmissão. O cálculo de hashes continua no Mac até que o minerador seja instalado também no ThinkPad.
+
 ## 1. O que você precisa
 
 - **Windows ou macOS** (execução do servidor e do hashing contínuo conferida em Mac Apple Silicon). Em Linux, o programa não foi testado. Para o regtest, o Bitcoin Core precisa estar disponível.
