@@ -4,9 +4,19 @@ Minerador solo de Bitcoin com hashing contínuo local e palpites adicionais de I
 
 > **Isto é um projeto educacional, não uma forma de ganhar dinheiro.** O SHA-256 não tem padrão, então o nonce da IA vale o mesmo que um número sorteado. Em 31/10/2026, a chance na mainnet era de cerca de **1 em 637 sextilhões por tentativa**, e cada chamada à IA é cobrada pelo provedor. Para ver um bloco ser aceito de verdade, sem gastar nada, use o [teste no regtest](#3-teste-sem-gastar-nada).
 
+## Melhorias deste fork
+
+- Hashing local contínuo com dois trabalhadores e espaços de nonce separados, em paralelo aos palpites da IA.
+- Taxa real de hashes por segundo e total calculado no painel; estimativa de tempo baseada nesse ritmo.
+- OpenRouter com respostas curtas e limite de espera para descartar palpites que chegam depois da troca de bloco.
+- Fonte pública alternativa em caso de falha da API principal, com estado de conexão atualizado.
+- Registro distingue bloco transmitido por P2P de bloco aceito por um nó Bitcoin Core.
+
+O modo público ainda não confirma sozinho a aceitação de um bloco pela rede. Para montar candidatos com um nó próprio e obter o resultado de `submitblock`, use o modo **Mainnet com nó próprio**.
+
 ## 1. O que você precisa
 
-- **Windows** (testado no Windows 10). Em Linux e macOS o programa não foi testado, e o Bitcoin Core precisa ser instalado à mão.
+- **Windows ou macOS** (execução do servidor e do hashing contínuo conferida em Mac Apple Silicon). Em Linux, o programa não foi testado. Para o regtest, o Bitcoin Core precisa estar disponível.
 - **Python 3.10 ou mais novo** ([python.org](https://www.python.org/downloads/)). Testado com o Python 3.12. No instalador, marque **Add Python to PATH**.
 - **Git**, para baixar o projeto, ou o botão **Code > Download ZIP** do GitHub.
 - **Internet**, para os dados da rede Bitcoin.
@@ -24,6 +34,14 @@ cd <pasta-do-projeto>
 **Passo 2: abra o programa.** Dê dois cliques em **`iniciar.bat`**. Na primeira vez, ele cria o ambiente Python e instala as dependências, o que leva alguns minutos. Depois, o navegador abre em http://127.0.0.1:8765.
 
 Deixe a janela preta aberta enquanto usa o programa. Fechar a janela encerra o servidor, e o navegador passa a mostrar `Failed to fetch` ou **Servidor parado**.
+
+No macOS, use o Terminal na pasta do projeto:
+
+```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python run.py
+```
 
 **Passo 3: cadastre o endereço da carteira.** Na aba **Carteira & Rede**, cole o seu endereço público (`bc1…`, `1…` ou `3…`) e clique em **Salvar endereço**. Nunca digite a frase de recuperação (seed) nem a chave privada.
 
