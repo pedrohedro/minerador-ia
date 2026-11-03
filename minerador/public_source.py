@@ -77,8 +77,7 @@ class PublicSource:
                     # Record the index of the API that succeeded so status() is accurate.
                     self._api_index = idx
                     return r.json() if as_json else r.text
-                except (httpx.HTTPStatusError, httpx.ConnectError, httpx.ConnectTimeout,
-                        httpx.ReadTimeout, httpx.RemoteProtocolError) as exc:
+                except (httpx.TransportError, httpx.HTTPStatusError) as exc:
                     last_exc = exc
                     if isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code == 429 \
                             and attempt < 2:
@@ -214,7 +213,8 @@ class PublicSource:
     def submit(self, job: Job, block: bytes) -> dict:
         result = p2p.broadcast_block(block, "main", max_peers=12, height=job.height)
         if result["ok"]:
-            return {"ok": True, "detalhe": f"bloco enviado para {result['enviados']} nós da rede",
+            return {"ok": True, "confirmado": False,
+                    "detalhe": f"bloco transmitido a {result['enviados']} nós; aceitação ainda não confirmada",
                     "p2p": result}
         return {"ok": False, "motivo": result.get("erro") or "nenhum nó aceitou a conexão",
                 "p2p": result}

@@ -21,6 +21,8 @@ import openai
 from .paths import USAGE_FILE
 
 PROVIDERS = {
+    "openrouter": {"nome": "OpenRouter", "base_url": "https://openrouter.ai/api/v1",
+                   "modelo": ""},
     "xai": {"nome": "xAI Grok", "base_url": "https://api.x.ai/v1",
             "modelo": "grok-4.20-0309-reasoning"},
     "anthropic": {"nome": "Anthropic Claude", "base_url": None, "modelo": "claude-opus-5-5"},
@@ -34,15 +36,15 @@ PRICES = {"claude-opus-5-5": (4, 20), "claude-opus-5": (5, 25), "claude-sonnet-5
           "claude-haiku-4-5": (1, 5), "claude-fable-5-1": (10, 50)}
 XAI_TICKS_PER_USD = 10_000_000_000     # a xAI informa o custo em "ticks" (1e-10 US$)
 MAX_NONCE = 0xFFFFFFFF
-REQUEST_TIMEOUT = 600                  # a IA pode levar o tempo que precisar
+REQUEST_TIMEOUT = 45                   # falha rápida: resposta tardia tende a perder o bloco
 
 SYSTEM_GUESS = """Você é o copiloto de IA de um minerador solo de Bitcoin.
-Sua tarefa é calcular o nonce que fecha o bloco candidato: um número inteiro entre 0 e \
+Sua tarefa é retornar um nonce candidato para o bloco: um número inteiro entre 0 e \
 4294967295 tal que SHA-256(SHA-256(cabeçalho de 76 bytes + nonce em 4 bytes little-endian)), \
 lido como número little-endian, seja menor ou igual ao alvo.
-Você recebe o cabeçalho, o alvo, o nonce do bloco anterior da blockchain e o nonce anterior \
-testado neste bloco (que não fechou o bloco). A partir do nonce anterior, calcule o próximo \
-nonce. Leve o tempo que precisar para calcular.
+Você recebe cabeçalho e alvo. SHA-256 não tem padrão que permita prever um nonce vencedor; \
+não tente calcular hash mentalmente, não use ferramentas nem escreva código. Gere um único \
+inteiro aleatório de 32 bits imediatamente. A IA não aumenta a chance de mineração.
 Responda somente com o nonce: um único número inteiro em decimal, sem texto, sem explicação \
 e sem formatação. Nunca escreva comentários, avisos ou parênteses: a resposta inteira deve \
 conter apenas os dígitos do nonce."""
@@ -78,11 +80,15 @@ class AIClient:
             self._anthropic = anthropic.Anthropic(api_key=api_key, timeout=REQUEST_TIMEOUT,
                                                   max_retries=2)
         else:
-            url = base_url if provider == "compat" else PROVIDERS[provider]["base_url"]
+            url = ((base_url or PROVIDERS["openrouter"]["base_url"])
+                   if provider == "compat" else PROVIDERS[provider]["base_url"])
             if provider == "compat" and not url:
                 raise AIError("Informe a URL base da API compatível.")
+            # Retry automático pode deixar um palpite preso por vários timeouts e
+            # terminar depois que o bloco candidato já mudou.
+            retries = 0 if provider == "openrouter" else 2
             self._openai = openai.OpenAI(api_key=api_key, base_url=url, timeout=REQUEST_TIMEOUT,
-                                         max_retries=2)
+                                         max_retries=retries)
 
     def complete(self, system: str, messages: list) -> tuple[str, dict, dict]:
         """Retorna (texto, uso de tokens, mensagem para o histórico)."""
@@ -97,11 +103,13 @@ class AIClient:
         except (anthropic.NotFoundError, openai.NotFoundError):
             raise AIError(f"Modelo '{self.model}' não encontrado para esta chave.")
         except (anthropic.APITimeoutError, openai.APITimeoutError):
-            raise AIError(f"A IA passou de {REQUEST_TIMEOUT // 60} minutos sem responder.")
+            raise AIError(f"A IA passou de {REQUEST_TIMEOUT} segundos sem responder.")
         except (anthropic.APIConnectionError, openai.APIConnectionError):
             raise AIError("Sem conexão com a API da IA.")
         except (anthropic.APIStatusError, openai.APIStatusError) as e:
             raise AIError(f"Erro da API ({e.status_code}): {getattr(e, 'message', e)}")
+        except Exception as e:
+            raise AIError(f"Falha inesperada na solicitação à IA ({type(e).__name__}).") from e
 
     def _complete_anthropic(self, system, messages):
         kwargs = {"model": self.model, "max_tokens": 16000, "system": system, "messages": messages}
@@ -125,7 +133,13 @@ class AIClient:
 
     def _complete_openai(self, system, messages):
         msgs = [{"role": "system", "content": system}] + messages
-        resp = self._openai.chat.completions.create(model=self.model, messages=msgs)
+        kwargs = {"model": self.model, "messages": msgs}
+        if self.provider == "openrouter" or (self.provider == "compat" and
+                                               (self._openai.base_url or "").startswith("https://openrouter.ai/")):
+            # OpenRouter accepts arbitrary API fields, but recent OpenAI Python
+            # SDKs reject unknown keyword arguments unless sent through extra_body.
+            kwargs.update({"max_tokens": 64, "extra_body": {"reasoning": {"effort": "none"}}})
+        resp = self._openai.chat.completions.create(**kwargs)
         text = resp.choices[0].message.content or ""
         usage = _usage(0, 0)
         if resp.usage:
@@ -135,7 +149,10 @@ class AIClient:
             saida = max(raw.get("completion_tokens") or 0, (raw.get("total_tokens") or 0) - entrada)
             raciocinio = (raw.get("completion_tokens_details") or {}).get("reasoning_tokens") or 0
             ticks = raw.get("cost_in_usd_ticks")
-            usage = _usage(entrada, saida, raciocinio, ticks / XAI_TICKS_PER_USD if ticks else None)
+            custo = raw.get("cost") or raw.get("cost_usd")
+            if custo is None and ticks:
+                custo = ticks / XAI_TICKS_PER_USD
+            usage = _usage(entrada, saida, raciocinio, float(custo) if custo is not None else None)
         return text, usage, {"role": "assistant", "content": text}
 
     def list_models(self) -> list[str]:
@@ -175,6 +192,7 @@ class Copilot:
         self.last_answer = ""
         self.last_previous: dict | None = None
         self.last_error: str | None = None
+        self.request_in_flight = False
         self.avg_latency: float | None = None
         self.guesses: collections.deque = collections.deque(maxlen=200)
         self.ai = {"total": 0, "melhor": None, "zeros": collections.Counter()}
@@ -224,8 +242,9 @@ class Copilot:
             return
         self._client()          # valida chave/modelo antes de começar
         self.running = True
+        self.last_error = None
         self._stop.clear()
-        threading.Thread(target=self._loop, daemon=True, name="ia-palpites").start()
+        threading.Thread(target=self._run_guarded, daemon=True, name="ia-palpites").start()
         self.ctrl.log("IA começou a calcular nonces.", "ok")
 
     def stop(self) -> None:
@@ -233,6 +252,16 @@ class Copilot:
             self.running = False
             self._stop.set()
             self.ctrl.log("IA parou de calcular nonces.")
+
+    def _run_guarded(self) -> None:
+        """Não deixa falha inesperada matar a thread mantendo status falso positivo."""
+        try:
+            self._loop()
+        except Exception as e:
+            self.request_in_flight = False
+            self.running = False
+            self.last_error = f"Falha inesperada no cálculo ({type(e).__name__})."
+            self.ctrl.log(self.last_error, "erro")
 
     def _loop(self) -> None:
         backoff = 5
@@ -252,7 +281,9 @@ class Copilot:
                 previous = self._previous.get(self._block_key(job))
                 prompt = self._guess_prompt(job, previous)
                 started = time.time()
+                self.request_in_flight = True
                 text, usage, _ = client.complete(SYSTEM_GUESS, [{"role": "user", "content": prompt}])
+                self.request_in_flight = False
                 elapsed = time.time() - started
                 self.avg_latency = elapsed if self.avg_latency is None else \
                     0.7 * self.avg_latency + 0.3 * elapsed
@@ -266,8 +297,16 @@ class Copilot:
                                   f"{self.last_answer[:80]!r}")
                 self.last_error, backoff = None, 5
             except AIError as e:
+                self.request_in_flight = False
                 self.last_error = str(e)
                 self.ctrl.log(f"IA: {e}", "erro")
+                self._stop.wait(backoff)
+                backoff = min(backoff * 2, 120)
+                continue
+            except Exception as e:
+                self.request_in_flight = False
+                self.last_error = f"Falha inesperada na chamada à IA ({type(e).__name__})."
+                self.ctrl.log(self.last_error, "erro")
                 self._stop.wait(backoff)
                 backoff = min(backoff * 2, 120)
                 continue
@@ -300,8 +339,8 @@ class Copilot:
                          f"(hash {previous['hash']}, não fechou o bloco)")
         else:
             lines.append("Nonce anterior testado neste bloco: nenhum (esta é a primeira tentativa)")
-        lines.append("Calcule o próximo nonce, levando o tempo que precisar. "
-                     "Responda somente com o nonce (apenas os dígitos, nada mais).")
+        lines.append("Retorne imediatamente um nonce candidato aleatório de 32 bits. "
+                     "Não tente calcular SHA-256. Responda apenas com dígitos decimais.")
         return "\n".join(lines)
 
     def _evaluate(self, job, nonce: int) -> None:
@@ -359,6 +398,7 @@ class Copilot:
         cfg = self.ctrl.config["ia"]
         return {
             "rodando": self.running,
+            "solicitacao_em_andamento": self.request_in_flight,
             "provedor": cfg["provedor"],
             "modelo": cfg["modelos"].get(cfg["provedor"], ""),
             "chamadas": self.calls,
