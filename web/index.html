@@ -212,9 +212,9 @@
       </div>
       <div class="row">
         <label class="field"><span>Intervalo entre chamadas (s)</span><input id="inInterval" type="number" min="0"></label>
-        <label class="field"><span>Limite de chamadas</span><input id="inMaxCalls" type="number" min="1"></label>
+        <label class="field"><span>Limite de chamadas (0 = sem limite)</span><input id="inMaxCalls" type="number" min="0"></label>
       </div>
-      <p class="muted small">Cada chamada envia o cabeçalho, o alvo e o nonce anterior, e pede para a IA calcular o próximo nonce, levando o tempo que precisar e respondendo só com o número. Modelos com raciocínio pensam mais e custam mais por chamada. O limite de chamadas protege seu saldo na API.</p>
+      <p class="muted small">Cada chamada envia o cabeçalho, o alvo e o nonce anterior, e pede para a IA calcular o próximo nonce, levando o tempo que precisar e respondendo só com o número. Modelos com raciocínio pensam mais e custam mais por chamada. Use 0 para continuar até você clicar em Parar ou o provedor recusar novas chamadas por falta de créditos. Confira o saldo no provedor.</p>
       <div class="actions">
         <button id="btnSaveAi" class="btn">Salvar</button>
         <button id="btnAiStart2" class="btn primary">Iniciar palpites</button>

@@ -71,7 +71,7 @@ python3 -m venv .venv
 
 **Passo 4: conecte.** Deixe o modo **Mainnet solo, sem nó** e clique em **Salvar e conectar**. O bloco candidato aparece no **Painel** em poucos segundos e dois trabalhadores locais começam a calcular hashes continuamente. Na aba **Carteira & Rede**, você pode ativar o uso de todos os núcleos das 20h às 9h. Desconectar encerra o cálculo.
 
-**Passo 5: configure a IA.** Na aba **Inteligência Artificial**, escolha o provedor, cole a chave, clique em **Listar modelos** e escolha um modelo. Defina um **limite de chamadas** baixo para controlar o gasto e clique em **Salvar**.
+**Passo 5: configure a IA.** Na aba **Inteligência Artificial**, escolha o provedor, cole a chave, clique em **Listar modelos** e escolha um modelo. Defina um **limite de chamadas** para controlar o gasto, ou use **0** para não parar por contagem de chamadas, e clique em **Salvar**. Sem limite, a IA continua até você parar ou o provedor recusar novas chamadas por falta de créditos.
 
 **Passo 6: opcionalmente, inicie os palpites da IA.** Clique em **Iniciar palpites**. A partir daqui, as chamadas são cobradas. Acompanhe os tokens no **Painel** e clique em **Parar** quando quiser encerrar a IA. O hashing local continua até você desconectar.
 

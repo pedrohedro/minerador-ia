@@ -155,7 +155,7 @@ class Controller:
                     new["ia"]["modelos"][p] = str(model).strip()
             if "base_url_compat" in ia:
                 new["ia"]["base_url_compat"] = str(ia["base_url_compat"]).strip()
-            for key, lo, hi in (("intervalo", 0, 3600), ("max_chamadas", 1, 1_000_000)):
+            for key, lo, hi in (("intervalo", 0, 3600), ("max_chamadas", 0, 1_000_000)):
                 if key in ia:
                     new["ia"][key] = max(lo, min(hi, float(ia[key]) if key == "intervalo"
                                                  else int(ia[key])))

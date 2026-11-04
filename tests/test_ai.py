@@ -34,12 +34,12 @@ def test_prompt_sends_previous_nonce_and_asks_only_the_nonce():
     assert "Nonce do bloco anterior (altura 969104): 3932395645" in first
     assert "nenhum (esta é a primeira tentativa)" in first
     assert job.summary()["cabecalho_sem_nonce"] in first
-    assert "Responda somente com o nonce" in first
+    assert "Responda apenas com dígitos decimais" in first
 
     check = job.check(1234)
     second = Copilot._guess_prompt(job, {"nonce": 1234, "hash": check["hash"]})
     assert f"Nonce anterior testado neste bloco: 1234 (hash {check['hash']}" in second
-    assert "Calcule o próximo nonce" in second
+    assert "Retorne imediatamente um nonce candidato aleatório de 32 bits" in second
 
 
 # ---- a IA segue de bloco em bloco -------------------------------------------------------
@@ -121,3 +121,41 @@ def test_ai_keeps_going_block_after_block(tmp_path, monkeypatch):
     # a resposta 7 era para o bloco 100, que a rede já tinha fechado: descartada
     assert ctrl.tested == [(100, 5), (100, 6), (101, 8)]
     assert any("descartada" in m for m in ctrl.logs)
+
+
+def test_ai_zero_limit_keeps_calling_until_stopped(tmp_path, monkeypatch):
+    monkeypatch.setattr(ai_module, "USAGE_FILE", tmp_path / "uso.json")
+    ctrl = FakeCtrl(_job_at(100, prev_block_nonce=111))
+    ctrl.config["ia"]["max_chamadas"] = 0
+    cop = Copilot(ctrl)
+
+    def finish():
+        cop.running = False
+        return "3"
+
+    fake = FakeClient([lambda: "1", lambda: "2", finish])
+    monkeypatch.setattr(cop, "_client", lambda: fake)
+    cop.running = True
+    cop._loop()
+
+    assert cop.calls == 3
+    assert [nonce for _, nonce in ctrl.tested] == [1, 2, 3]
+
+
+def test_ai_stops_when_openrouter_credits_end(tmp_path, monkeypatch):
+    monkeypatch.setattr(ai_module, "USAGE_FILE", tmp_path / "uso.json")
+    ctrl = FakeCtrl(_job_at(100, prev_block_nonce=111))
+    ctrl.config["ia"]["max_chamadas"] = 0
+    cop = Copilot(ctrl)
+
+    class NoCredits:
+        def complete(self, *_args):
+            raise ai_module.AIPaymentRequired("OpenRouter recusou a chamada por saldo ou limite de gastos.")
+
+    monkeypatch.setattr(cop, "_client", lambda: NoCredits())
+    cop.running = True
+    cop._loop()
+
+    assert not cop.running
+    assert cop.calls == 0
+    assert "saldo ou limite" in cop.last_error

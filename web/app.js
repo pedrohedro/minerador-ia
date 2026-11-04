@@ -147,7 +147,7 @@ function modeBody() {
 function aiBody() {
   const p = $("inProvider").value;
   const ia = { provedor: p, modelos: { [p]: $("inModel").value.trim() },
-    intervalo: Number($("inInterval").value || 0), max_chamadas: Number($("inMaxCalls").value || 1),
+    intervalo: Number($("inInterval").value || 0), max_chamadas: Number($("inMaxCalls").value || 0),
     base_url_compat: $("inBaseUrl").value.trim() };
   const key = $("inApiKey").value.trim();
   if (key) ia.chaves = { [p]: key };
@@ -519,7 +519,9 @@ function render() {
   badge.textContent = ia.solicitacao_em_andamento ? "aguardando modelo" : ia.rodando ? "ativa" : "parada";
   badge.className = `badge ${ia.rodando && !ia.ultimo_erro ? "on" : ""} ${ia.ultimo_erro ? "err" : ""}`;
   $("aiModelLine").textContent = `${CFG?.provedores?.[ia.provedor] || ia.provedor} · modelo ${ia.modelo || "—"}`;
-  $("aiCalls").textContent = `${fmtInt(ia.chamadas)} de ${fmtInt(ia.limite_chamadas)}`;
+  $("aiCalls").textContent = ia.limite_chamadas > 0
+    ? `${fmtInt(ia.chamadas)} de ${fmtInt(ia.limite_chamadas)}`
+    : `${fmtInt(ia.chamadas)} · sem limite`;
   const ses = ia.tokens_sessao, tot = ia.tokens_total;
   $("aiTokens").textContent = `${fmtInt(ses.total)} (${fmtInt(ses.entrada)} entrada · ${fmtInt(ses.saida)} saída)`;
   $("aiCost").textContent = ia.custo_conhecido ? fmtUSD(ses.custo_usd) : "veja no painel do provedor";
