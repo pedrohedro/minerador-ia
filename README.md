@@ -38,6 +38,9 @@ O modo público ainda não confirma sozinho a aceitação de um bloco pela rede.
 
 O nó é dedicado à validação e transmissão. O cálculo de hashes continua no Mac até que o minerador seja instalado também no ThinkPad.
 
+Para executar o Minerador IA continuamente no ThinkPad, use `MINERADOR_WORKERS=all` no serviço do aplicativo. Essa opção usa todos os processadores lógicos em qualquer horário; sem ela, permanece o limite configurado no painel. O servidor web deve escutar somente em `127.0.0.1` e ser acessado do Mac por túnel SSH.
+Para iniciar automaticamente a mineração e os palpites após reiniciar o serviço, execute `run.py --sem-navegador --autoconectar --iniciar-ia`.
+
 ## 1. O que você precisa
 
 - **Windows ou macOS** (execução do servidor e do hashing contínuo conferida em Mac Apple Silicon). Em Linux, o programa não foi testado. Para o regtest, o Bitcoin Core precisa estar disponível.

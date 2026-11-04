@@ -19,6 +19,8 @@ BATCH = 8192
 
 
 def worker_schedule(enabled: bool, now: datetime | None = None) -> tuple[int, str]:
+    if os.environ.get("MINERADOR_WORKERS", "").strip().lower() == "all":
+        return max(1, os.cpu_count() or 1), "integral"
     hour = (now or datetime.now(TIMEZONE)).astimezone(TIMEZONE).hour
     night = hour >= 20 or hour < 9
     return (max(DAY_WORKERS, os.cpu_count() or DAY_WORKERS) if enabled and night
