@@ -4,10 +4,10 @@
 set -euo pipefail
 umask 077
 
-VERSION=32.1
-ARCHIVE="bitcoin-${VERSION}-x86_64-linux-gnu.tar.gz"
+BITCOIN_VERSION=32.1
+ARCHIVE="bitcoin-${BITCOIN_VERSION}-x86_64-linux-gnu.tar.gz"
 SHA256=61545c17c3120fb7412f896d248b11993af04ec8817aad3649c55b2afb044963
-URL="https://bitcoincore.org/bin/bitcoin-core-${VERSION}/${ARCHIVE}"
+URL="https://bitcoincore.org/bin/bitcoin-core-${BITCOIN_VERSION}/${ARCHIVE}"
 CONFIG_DIR=/etc/bitcoin
 DATA_DIR=/var/lib/bitcoind
 SERVICE=/etc/systemd/system/bitcoind.service
@@ -42,18 +42,18 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y ca-certificates curl python3 o
 
 WORK_DIR=$(mktemp -d)
 trap 'rm -rf "${WORK_DIR}"' EXIT
-printf 'Baixando Bitcoin Core %s e verificando SHA-256...\n' "${VERSION}"
+printf 'Baixando Bitcoin Core %s e verificando SHA-256...\n' "${BITCOIN_VERSION}"
 curl --proto '=https' --tlsv1.2 -fL --retry 3 --output "${WORK_DIR}/${ARCHIVE}" "${URL}"
 printf '%s  %s\n' "${SHA256}" "${WORK_DIR}/${ARCHIVE}" | sha256sum --check --status || die 'SHA-256 não confere. Instalação cancelada.'
-tar -xzf "${WORK_DIR}/${ARCHIVE}" -C "${WORK_DIR}" "bitcoin-${VERSION}/bin/bitcoind" "bitcoin-${VERSION}/bin/bitcoin-cli"
+tar -xzf "${WORK_DIR}/${ARCHIVE}" -C "${WORK_DIR}" "bitcoin-${BITCOIN_VERSION}/bin/bitcoind" "bitcoin-${BITCOIN_VERSION}/bin/bitcoin-cli"
 
 if ! id bitcoin >/dev/null 2>&1; then
     useradd --system --home-dir "${DATA_DIR}" --shell /usr/sbin/nologin bitcoin
 fi
 install -d -o bitcoin -g bitcoin -m 0700 "${DATA_DIR}"
 install -d -o root -g bitcoin -m 0750 "${CONFIG_DIR}"
-install -o root -g root -m 0755 "${WORK_DIR}/bitcoin-${VERSION}/bin/bitcoind" /usr/local/bin/bitcoind
-install -o root -g root -m 0755 "${WORK_DIR}/bitcoin-${VERSION}/bin/bitcoin-cli" /usr/local/bin/bitcoin-cli
+install -o root -g root -m 0755 "${WORK_DIR}/bitcoin-${BITCOIN_VERSION}/bin/bitcoind" /usr/local/bin/bitcoind
+install -o root -g root -m 0755 "${WORK_DIR}/bitcoin-${BITCOIN_VERSION}/bin/bitcoin-cli" /usr/local/bin/bitcoin-cli
 
 # Mesmo algoritmo usado pelo share/rpcauth/rpcauth.py oficial do Bitcoin Core.
 AUTH_DATA=$(python3 - <<'PY'
