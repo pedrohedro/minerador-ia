@@ -3,6 +3,7 @@ import pytest
 
 from minerador import btc
 from minerador import controller as controller_module
+from minerador import hasher
 from minerador.job import build_job
 from minerador.public_source import PublicSource
 
@@ -48,3 +49,9 @@ def test_address_from_other_network_is_refused_while_connected(ctrl):
 def test_zero_ai_call_limit_is_saved_as_unlimited(ctrl):
     ctrl.update_config({"ia": {"max_chamadas": 0}})
     assert ctrl.config["ia"]["max_chamadas"] == 0
+
+
+def test_explicit_all_workers_overrides_day_schedule(monkeypatch):
+    monkeypatch.setenv("MINERADOR_WORKERS", "all")
+    monkeypatch.setattr(hasher.os, "cpu_count", lambda: 12)
+    assert hasher.worker_schedule(False) == (12, "integral")
