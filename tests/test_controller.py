@@ -43,3 +43,8 @@ def test_address_from_other_network_is_refused_while_connected(ctrl):
     with pytest.raises(ValueError):
         ctrl.update_config({"endereco": "tb1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3q0sl5k7"})
     assert ctrl.config["endereco"] == OLD
+
+
+def test_zero_ai_call_limit_is_saved_as_unlimited(ctrl):
+    ctrl.update_config({"ia": {"max_chamadas": 0}})
+    assert ctrl.config["ia"]["max_chamadas"] == 0

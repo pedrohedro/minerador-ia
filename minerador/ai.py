@@ -62,6 +62,10 @@ class AIError(Exception):
     pass
 
 
+class AIPaymentRequired(AIError):
+    pass
+
+
 def _usage(entrada: int, saida: int, raciocinio: int = 0, custo: float | None = None) -> dict:
     return {"entrada": entrada, "saida": saida, "raciocinio": raciocinio,
             "total": entrada + saida, "custo_usd": custo}
@@ -107,6 +111,8 @@ class AIClient:
         except (anthropic.APIConnectionError, openai.APIConnectionError):
             raise AIError("Sem conexão com a API da IA.")
         except (anthropic.APIStatusError, openai.APIStatusError) as e:
+            if self.provider == "openrouter" and e.status_code == 402:
+                raise AIPaymentRequired("OpenRouter recusou a chamada por saldo ou limite de gastos (HTTP 402). Palpites da IA parados.") from e
             raise AIError(f"Erro da API ({e.status_code}): {getattr(e, 'message', e)}")
         except Exception as e:
             raise AIError(f"Falha inesperada na solicitação à IA ({type(e).__name__}).") from e
@@ -271,7 +277,7 @@ class Copilot:
             if job is None or job.job_id in self.ctrl.solved_jobs:
                 self._stop.wait(2)
                 continue
-            if self.calls >= int(cfg["max_chamadas"]):
+            if int(cfg["max_chamadas"]) > 0 and self.calls >= int(cfg["max_chamadas"]):
                 self.ctrl.log(f"Limite de {cfg['max_chamadas']} chamadas à IA atingido. "
                               "Aumente o limite na aba IA para continuar.")
                 self.running = False
@@ -296,6 +302,12 @@ class Copilot:
                     raise AIError("A IA não respondeu só com o nonce (resposta descartada): "
                                   f"{self.last_answer[:80]!r}")
                 self.last_error, backoff = None, 5
+            except AIPaymentRequired as e:
+                self.request_in_flight = False
+                self.last_error = str(e)
+                self.running = False
+                self.ctrl.log(f"IA: {e}", "erro")
+                break
             except AIError as e:
                 self.request_in_flight = False
                 self.last_error = str(e)

@@ -103,7 +103,7 @@ Na aba **Inteligência Artificial**:
 1. Escolha o **provedor**: xAI Grok, Anthropic Claude, OpenAI ou outra API compatível com OpenAI (nesse caso, informe a URL base).
 2. Cole a **chave da API**. Ela é criada no site do provedor.
 3. Escolha o **modelo**. O botão **Listar modelos** preenche as opções disponíveis para a sua chave.
-4. Ajuste o **intervalo entre chamadas** (padrão 5 s) e o **limite de chamadas** (padrão 200). O limite é a sua proteção contra gastos.
+4. Ajuste o **intervalo entre chamadas** (padrão 5 s) e o **limite de chamadas** (padrão 200). Use **0** para continuar sem limite de contagem; nesse caso, acompanhe o saldo no provedor. O OpenRouter encerra os palpites se recusar uma chamada por falta de créditos.
 5. Clique em **Salvar**.
 
 ### Passo 6: iniciar os palpites
@@ -318,7 +318,8 @@ Para comparar: a rede inteira testa cerca de 1 sextilhão de hashes por segundo.
 | `Modelo … não encontrado para esta chave` | A chave não dá acesso ao modelo | Use **Listar modelos** |
 | `Limite de uso da API atingido` | Rate limit do provedor | O programa tenta de novo sozinho, ou aumente o intervalo |
 | `A IA não respondeu só com o nonce` | O modelo respondeu com texto, e a chamada foi cobrada | Troque de modelo se isso se repetir |
-| `Limite de N chamadas à IA atingido` | Chegou ao limite configurado | Aumente o limite, clique em **Salvar** e em **Iniciar palpites**, ou reabra o programa |
+| `Limite de N chamadas à IA atingido` | Chegou ao limite configurado | Aumente o limite ou use **0** para não parar por contagem; clique em **Salvar** e em **Iniciar palpites** |
+| `OpenRouter recusou a chamada por saldo ou limite de gastos (HTTP 402)` | O provedor recusou a chamada | Confira o saldo e os limites da chave no OpenRouter antes de reiniciar os palpites |
 | `Bitcoin Core ainda não foi baixado` | Falta o nó de teste | Clique em **Baixar Bitcoin Core** |
 | `Conecte-se no modo Regtest primeiro` | **Preparar 101 blocos** sem conexão | Conecte no modo Regtest |
 | `Insufficient funds` | Transações de teste sem saldo maduro | Clique antes em **Preparar 101 blocos** |
@@ -435,7 +436,7 @@ Os palpites da IA usam sempre extranonce zerado. A variação do cabeçalho vem 
 | `ia.modelos.*` | Definidos em `PROVIDERS` | Modelo de cada provedor | Na próxima chamada |
 | `ia.base_url_compat` | vazio | URL da API compatível | Na próxima chamada |
 | `ia.intervalo` | `5` | Segundos entre chamadas, de 0 a 3600 | Na próxima chamada |
-| `ia.max_chamadas` | `200` | Limite por execução | Na próxima chamada |
+| `ia.max_chamadas` | `200` | Limite por execução; `0` desativa o limite de contagem | Na próxima chamada |
 
 ### API local
 
