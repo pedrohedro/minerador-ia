@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Instala Bitcoin Core 32.1 como nó mainnet podado em Debian 13 x86_64.
-# Execute no ThinkPad, depois de instalar Debian. Não particiona nem formata discos.
+# Instala Bitcoin Core 32.1 como nó mainnet podado em Debian 13 ou Ubuntu x86_64.
+# Execute no ThinkPad, depois de instalar Linux. Não particiona nem formata discos.
 set -euo pipefail
 umask 077
 
@@ -20,7 +20,13 @@ die() { printf 'Erro: %s\n' "$*" >&2; exit 1; }
 [[ -r /etc/os-release ]] || die 'Não foi possível identificar o sistema.'
 # shellcheck disable=SC1091
 source /etc/os-release
-[[ ${ID:-} == debian && ${VERSION_ID:-} == 13 ]] || die 'Este instalador exige Debian 13.'
+if [[ ${ID:-} == debian ]]; then
+    [[ ${VERSION_ID:-} == 13 ]] || die 'Este instalador exige Debian 13 ou Ubuntu.'
+elif [[ ${ID:-} != ubuntu ]]; then
+    die 'Este instalador exige Debian 13 ou Ubuntu.'
+fi
+command -v apt-get >/dev/null && command -v systemctl >/dev/null || \
+    die 'Este instalador exige apt-get e systemd.'
 [[ ! -e ${SERVICE} && ! -e ${CONFIG_DIR}/bitcoin.conf ]] || die 'Nó já configurado. Não sobrescrevi serviço nem credenciais.'
 [[ ! -e /usr/local/bin/bitcoind ]] || die '/usr/local/bin/bitcoind já existe. Verifique antes de substituir.'
 
