@@ -144,7 +144,9 @@ class AIClient:
                                                (self._openai.base_url or "").startswith("https://openrouter.ai/")):
             # OpenRouter accepts arbitrary API fields, but recent OpenAI Python
             # SDKs reject unknown keyword arguments unless sent through extra_body.
-            kwargs.update({"max_tokens": 64, "extra_body": {"reasoning": {"effort": "none"}}})
+            # Palpites pedem um número; o chat precisa de espaço para frases completas.
+            limit = 4096 if system == SYSTEM_CHAT else 64
+            kwargs.update({"max_tokens": limit, "extra_body": {"reasoning": {"effort": "none"}}})
         resp = self._openai.chat.completions.create(**kwargs)
         text = resp.choices[0].message.content or ""
         usage = _usage(0, 0)
