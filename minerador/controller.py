@@ -6,6 +6,7 @@ import copy
 import json
 import os
 import random
+import sys
 import threading
 import time
 
@@ -100,10 +101,17 @@ class Controller:
                      "hashes": self.hasher.total if hasattr(self, "hasher") else self._saved_hashes,
                      "events": list(self.events)}
             temporary = MINING_STATE_FILE.with_suffix(".tmp")
-            fd = os.open(temporary, os.O_CREAT | os.O_WRONLY | os.O_TRUNC, 0o600)
-            with os.fdopen(fd, "w", encoding="utf-8") as stream:
-                json.dump(state, stream, ensure_ascii=False)
-            os.replace(temporary, MINING_STATE_FILE)
+            try:
+                fd = os.open(temporary, os.O_CREAT | os.O_WRONLY | os.O_TRUNC, 0o600)
+                with os.fdopen(fd, "w", encoding="utf-8") as stream:
+                    json.dump(state, stream, ensure_ascii=False)
+                os.replace(temporary, MINING_STATE_FILE)
+            except OSError as exc:
+                if not getattr(self, "_history_persist_error", False):
+                    print(f"Falha ao salvar histórico de mineração: {exc}", file=sys.stderr)
+                self._history_persist_error = True
+            else:
+                self._history_persist_error = False
 
     def _load_config(self) -> dict:
         try:
