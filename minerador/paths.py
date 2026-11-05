@@ -8,6 +8,7 @@ CONFIG_FILE = DATA_DIR / "config.json"
 FOUND_FILE = DATA_DIR / "blocos_encontrados.json"
 USAGE_FILE = DATA_DIR / "uso_ia.json"
 MINING_STATE_FILE = DATA_DIR / "estado_mineracao.json"
+AI_HISTORY_FILE = DATA_DIR / "palpites_ia.json"
 REGTEST_DIR = DATA_DIR / "regtest"
 CORE_DIR = ROOT / "bitcoin-core"
 

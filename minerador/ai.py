@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import collections
 import json
+import os
 import random
 import re
 import threading
@@ -18,7 +19,7 @@ import time
 import anthropic
 import openai
 
-from .paths import USAGE_FILE
+from .paths import AI_HISTORY_FILE, USAGE_FILE
 
 PROVIDERS = {
     "openrouter": {"nome": "OpenRouter", "base_url": "https://openrouter.ai/api/v1",
@@ -202,9 +203,10 @@ class Copilot:
         self.last_error: str | None = None
         self.request_in_flight = False
         self.avg_latency: float | None = None
-        self.guesses: collections.deque = collections.deque(maxlen=200)
-        self.ai = {"total": 0, "melhor": None, "zeros": collections.Counter()}
-        self.rnd = {"total": 0, "melhor": None, "zeros": collections.Counter()}
+        history = self._load_history()
+        self.guesses: collections.deque = collections.deque(history.get("guesses", []), maxlen=200)
+        self.ai = self._restore_stats(history.get("ai"))
+        self.rnd = self._restore_stats(history.get("rnd"))
         # (rede, altura) -> último nonce testado nesse bloco. A chave é a altura, e não o
         # candidato: o candidato é remontado a cada 90 s na mesma altura (transações e
         # horário novos) e a sequência de nonces anteriores deve continuar.
@@ -216,6 +218,45 @@ class Copilot:
         self._usage_lock = threading.Lock()
 
     # ---- contagem de tokens (persistida em data/uso_ia.json) ----
+    @staticmethod
+    def _restore_stats(saved: dict | None) -> dict:
+        if not isinstance(saved, dict):
+            return {"total": 0, "melhor": None, "zeros": collections.Counter()}
+        zeros = saved.get("zeros", {})
+        if not isinstance(zeros, dict):
+            zeros = {}
+        try:
+            return {"total": max(0, int(saved.get("total", 0))),
+                    "melhor": saved.get("melhor"),
+                    "zeros": collections.Counter({int(k): int(v) for k, v in zeros.items()})}
+        except (TypeError, ValueError):
+            return {"total": 0, "melhor": None, "zeros": collections.Counter()}
+
+    @staticmethod
+    def _load_history() -> dict:
+        try:
+            saved = json.loads(AI_HISTORY_FILE.read_text(encoding="utf-8"))
+            return saved if isinstance(saved, dict) else {}
+        except (FileNotFoundError, json.JSONDecodeError, OSError):
+            return {}
+
+    def _save_history(self) -> None:
+        state = {"guesses": list(self.guesses),
+                 "ai": {**self.ai, "zeros": dict(self.ai["zeros"])},
+                 "rnd": {**self.rnd, "zeros": dict(self.rnd["zeros"])}}
+        temporary = AI_HISTORY_FILE.with_suffix(".tmp")
+        try:
+            fd = os.open(temporary, os.O_CREAT | os.O_WRONLY | os.O_TRUNC, 0o600)
+            with os.fdopen(fd, "w", encoding="utf-8") as stream:
+                json.dump(state, stream, ensure_ascii=False)
+            os.replace(temporary, AI_HISTORY_FILE)
+        except OSError as exc:
+            if not getattr(self, "_history_error", False):
+                self.ctrl.log(f"Falha ao salvar histórico de palpites: {exc}", "erro")
+            self._history_error = True
+        else:
+            self._history_error = False
+
     @staticmethod
     def _load_usage() -> dict:
         base = _usage(0, 0, 0, 0.0)
@@ -368,6 +409,7 @@ class Copilot:
                                  "valido": result["valido"], "quando": time.time()})
         # Linha de base honesta: um nonce sorteado ao acaso para cada nonce da IA.
         self._record(self.rnd, job.check(random.getrandbits(32)))
+        self._save_history()
 
     @staticmethod
     def _record(stats: dict, result: dict) -> None:

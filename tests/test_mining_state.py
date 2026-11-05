@@ -4,6 +4,7 @@ import threading
 from types import SimpleNamespace
 
 from minerador import controller
+from minerador import ai
 
 
 def test_mining_history_survives_restart(tmp_path, monkeypatch):
@@ -20,3 +21,19 @@ def test_mining_history_survives_restart(tmp_path, monkeypatch):
     assert restored["checked_total"] == 12345
     assert restored["hashes"] == 12340
     assert restored["events"][0]["msg"] == "Bloco candidato atualizado"
+
+
+def test_best_ai_guess_survives_restart(tmp_path, monkeypatch):
+    monkeypatch.setattr(ai, "AI_HISTORY_FILE", tmp_path / "palpites_ia.json")
+    monkeypatch.setattr(ai, "USAGE_FILE", tmp_path / "uso_ia.json")
+    first = ai.Copilot(None)
+    first._record(first.ai, {"nonce": 123, "hash": "0000" + "f" * 60,
+                             "zeros_bits": 16})
+    first.guesses.appendleft({"nonce": 123, "hash": "0000" + "f" * 60,
+                              "zeros_bits": 16})
+    first._save_history()
+
+    restored = ai.Copilot(None)
+    assert restored.ai["melhor"]["zeros_bits"] == 16
+    assert restored.ai["total"] == 1
+    assert restored.guesses[0]["nonce"] == 123
