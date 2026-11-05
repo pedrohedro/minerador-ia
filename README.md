@@ -7,6 +7,7 @@ Minerador solo de Bitcoin com hashing contínuo local e palpites adicionais de I
 ## Melhorias deste fork
 
 - Hashing local contínuo com trabalhadores e espaços de nonce separados, em paralelo aos palpites da IA. A opção de horário usa todos os núcleos disponíveis das 20h às 9h e dois no restante do dia (horário de São Paulo).
+- Scanner SHA-256 nativo opcional no Linux, compilado com `bash scripts/build_native_hash.sh` após instalar compilador e OpenSSL de desenvolvimento. Sem a biblioteca, o hashing Python continua funcionando.
 - Taxa real de hashes por segundo e total calculado no painel; estimativa de tempo baseada nesse ritmo.
 - OpenRouter com respostas curtas e limite de espera para descartar palpites que chegam depois da troca de bloco.
 - Fonte pública alternativa em caso de falha da API principal, com estado de conexão atualizado.
@@ -43,7 +44,7 @@ Para iniciar automaticamente a mineração e os palpites após reiniciar o servi
 
 ## 1. O que você precisa
 
-- **Windows ou macOS** (execução do servidor e do hashing contínuo conferida em Mac Apple Silicon). Em Linux, o programa não foi testado. Para o regtest, o Bitcoin Core precisa estar disponível.
+- **Windows, macOS ou Linux** (execução do servidor e do hashing contínuo conferida em Mac Apple Silicon e ThinkPad Ubuntu). Para o regtest, o Bitcoin Core precisa estar disponível.
 - **Python 3.10 ou mais novo** ([python.org](https://www.python.org/downloads/)). Testado com o Python 3.12. No instalador, marque **Add Python to PATH**.
 - **Git**, para baixar o projeto, ou o botão **Code > Download ZIP** do GitHub.
 - **Internet**, para os dados da rede Bitcoin.
