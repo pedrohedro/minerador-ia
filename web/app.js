@@ -509,7 +509,7 @@ function render() {
   $("tGuesses").textContent = fmtInt(ia.ia.total);
   $("tGuessesSub").textContent = `+ ${fmtInt(ia.aleatorio.total)} aleatórios para comparar`;
   $("tHashrate").textContent = s.hashing?.trabalhadores ? `${fmtInt(s.hashing.hashes_por_segundo)} H/s` : "—";
-  $("tHashrateSub").textContent = `${fmtInt(s.hashing?.hashes || 0)} hashes · ${s.hashing?.trabalhadores || 0} trabalhadores (programados: ${s.hashing?.trabalhadores_programados || 2})`;
+  $("tHashrateSub").textContent = `${fmtInt(s.hashing?.hashes || 0)} hashes · média 1 min: ${fmtInt(s.hashing?.hashes_por_segundo_media_1m || 0)} H/s · ${s.hashing?.trabalhadores || 0} trabalhadores`;
   const best = ia.ia.melhor;
   $("tBest").textContent = best ? `${best.zeros_bits} bits` : "—";
   $("tBestSub").textContent = b ? `de ${b.zeros_necessarios} necessários para fechar o bloco` : "zeros no início do hash";

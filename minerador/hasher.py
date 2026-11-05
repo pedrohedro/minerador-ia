@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import collections
 import multiprocessing as mp
 import os
 import queue
@@ -90,6 +91,8 @@ class Hasher:
         self.last_count = self.total
         self.last_persist = time.monotonic()
         self.rate = 0.0
+        self.rate_1m = 0.0
+        self.rate_samples = collections.deque([(self.started, self.total)])
         self._quit = threading.Event()
         threading.Thread(target=self._loop, daemon=True, name="hash-manager").start()
 
@@ -155,6 +158,11 @@ class Hasher:
                 self.rate = (self.total - self.last_count) / elapsed
                 self.last_count = self.total
                 self.started = time.monotonic()
+                self.rate_samples.append((self.started, self.total))
+                while len(self.rate_samples) > 2 and self.rate_samples[1][0] < self.started - 60:
+                    self.rate_samples.popleft()
+                oldest_time, oldest_total = self.rate_samples[0]
+                self.rate_1m = (self.total - oldest_total) / max(self.started - oldest_time, 0.001)
             if time.monotonic() - self.last_persist >= 10:
                 self.ctrl.persist_mining_state()
                 self.last_persist = time.monotonic()
@@ -165,6 +173,7 @@ class Hasher:
         desired, period = worker_schedule(self.ctrl.config.get("hashing_noturno", False))
         return {"trabalhadores": sum(p.is_alive() for p in self.processes),
                 "hashes": self.total, "hashes_por_segundo": round(self.rate, 1),
+                "hashes_por_segundo_media_1m": round(self.rate_1m, 1),
                 "altura_ativa": self.ctrl.current_job.height if self.job_id and self.ctrl.current_job else None,
                 "trabalhadores_programados": desired, "periodo": period}
 

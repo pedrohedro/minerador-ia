@@ -14,6 +14,7 @@ from .job import Job, build_job
 from .rpc import RPCClient, RPCError
 
 TEMPLATE_REFRESH = 90   # segundos entre atualizações da lista de transações
+BLOCK_WAIT_MS = 1000
 CHAIN_TO_NETWORK = {"main": "main", "regtest": "regtest"}
 
 
@@ -32,6 +33,8 @@ class NodeSource:
         self.chain: str | None = None
         self.mining_info: dict = {}
         self._wake = threading.Event()
+        self._wait_supported = True
+        self.last_refresh_ms: float | None = None
 
     @property
     def network(self) -> str:
@@ -80,14 +83,18 @@ class NodeSource:
 
     def _loop(self) -> None:
         last_best = None
+        best = None
         last_refresh = 0.0
         while self.running:
             try:
-                best = self.rpc.call("getbestblockhash")
+                if best is None:
+                    best = self.rpc.call("getbestblockhash")
                 if best != last_best or self._wake.is_set() \
                         or time.time() - last_refresh > TEMPLATE_REFRESH:
                     self._wake.clear()
+                    started = time.monotonic()
                     self.refresh()
+                    self.last_refresh_ms = round((time.monotonic() - started) * 1000, 1)
                     last_best, last_refresh = best, time.time()
                 if not self.connected:
                     self.log("Conectado ao nó Bitcoin Core.", "ok")
@@ -96,9 +103,20 @@ class NodeSource:
                 if self.error != str(e):
                     self.log(f"Nó Bitcoin Core: {e}", "erro")
                 self.connected, self.error = False, str(e)
+                best = None
                 self._wake.wait(5)
                 continue
-            self._wake.wait(2)
+            if self._wait_supported:
+                try:
+                    best = self.rpc.call("waitfornewblock", BLOCK_WAIT_MS, last_best)["hash"]
+                except RPCError as e:
+                    self._wait_supported = False
+                    self.log(f"Aviso: waitfornewblock indisponível ({e}); "+
+                             "usando consulta periódica.")
+                    best = None
+            else:
+                self._wake.wait(2)
+                best = None
 
     def submit(self, job: Job, block: bytes) -> dict:
         try:
@@ -117,4 +135,6 @@ class NodeSource:
             "rede": self.chain,
             "altura_no": self.mining_info.get("blocks"),
             "mempool": self.mining_info.get("pooledtx"),
+            "ultimo_refresh_ms": self.last_refresh_ms,
+            "notificacao_bloco": self._wait_supported,
         }
