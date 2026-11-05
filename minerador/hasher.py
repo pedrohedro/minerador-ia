@@ -18,6 +18,7 @@ from .native_hash import NativeScanner
 DAY_WORKERS = 2
 TIMEZONE = ZoneInfo("America/Sao_Paulo")
 BATCH = 8192
+NATIVE_BATCH = 262144
 
 
 def worker_schedule(enabled: bool, now: datetime | None = None) -> tuple[int, str]:
@@ -47,7 +48,7 @@ def _worker(job, index: int, count: int, extra: bytes, stop, reports) -> None:
                 prefix = job.header(extra, 0)[:76]
                 scanner = NativeScanner(prefix, target)
                 nonce = index
-            processed, found = scanner.scan(nonce, count, min(BATCH, (0xFFFFFFFF - nonce) // count + 1))
+            processed, found = scanner.scan(nonce, count, min(NATIVE_BATCH, (0xFFFFFFFF - nonce) // count + 1))
             checked += processed
             nonce += processed * count
             if found is not None:
