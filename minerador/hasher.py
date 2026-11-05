@@ -9,6 +9,7 @@ import struct
 import threading
 import time
 from datetime import datetime
+from dataclasses import replace
 from zoneinfo import ZoneInfo
 
 from . import btc
@@ -91,8 +92,11 @@ class Hasher:
         self.worker_count = count
         self.stop_event = self.ctx.Event()
         self.reports = self.ctx.Queue()
+        # Os trabalhadores só precisam dos dados do cabeçalho, não das
+        # transações completas e dos detalhes usados para exibição e envio.
+        worker_job = replace(job, tx_raw=[], info={})
         self.processes = [self.ctx.Process(target=_worker,
-                          args=(job, i, count, self.generation, self.stop_event, self.reports), daemon=True)
+                          args=(worker_job, i, count, self.generation, self.stop_event, self.reports), daemon=True)
                           for i in range(count)]
         for process in self.processes:
             process.start()
