@@ -13,7 +13,7 @@ from . import btc
 from .job import Job, build_job
 from .rpc import RPCClient, RPCError
 
-TEMPLATE_REFRESH = 30   # segundos entre atualizações da lista de transações
+TEMPLATE_REFRESH = 90   # segundos entre atualizações da lista de transações
 CHAIN_TO_NETWORK = {"main": "main", "regtest": "regtest"}
 
 
