@@ -5,6 +5,7 @@ import hashlib
 import multiprocessing as mp
 import os
 import queue
+import secrets
 import struct
 import threading
 import time
@@ -12,6 +13,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from . import btc
+from .native_hash import NativeScanner
 
 DAY_WORKERS = 2
 TIMEZONE = ZoneInfo("America/Sao_Paulo")
@@ -27,15 +29,33 @@ def worker_schedule(enabled: bool, now: datetime | None = None) -> tuple[int, st
             else DAY_WORKERS), ("noite" if night else "dia")
 
 
-def _worker(job, index: int, count: int, generation: int, stop, reports) -> None:
+def _worker(job, index: int, count: int, extra: bytes, stop, reports) -> None:
     # A IA usa extra nonce zero; cada processo usa um valor distinto.
-    extra = ((generation << 32) + index + 1).to_bytes(8, "little")
     prefix = job.header(extra, 0)[:76]
     first = hashlib.sha256(prefix)
+    try:
+        scanner = NativeScanner(prefix, job.target)
+    except OSError:
+        scanner = None
     target = job.target
     nonce = index
     checked = 0
     while not stop.is_set():
+        if scanner is not None:
+            if nonce > 0xFFFFFFFF:
+                extra = (int.from_bytes(extra, "little") + count).to_bytes(8, "little")
+                prefix = job.header(extra, 0)[:76]
+                scanner = NativeScanner(prefix, target)
+                nonce = index
+            processed, found = scanner.scan(nonce, count, min(BATCH, (0xFFFFFFFF - nonce) // count + 1))
+            checked += processed
+            nonce += processed * count
+            if found is not None:
+                reports.put(("found", job.job_id, extra, found, checked))
+                return
+            reports.put(("progress", job.job_id, checked))
+            checked = 0
+            continue
         for _ in range(BATCH):
             if nonce > 0xFFFFFFFF:
                 extra = (int.from_bytes(extra, "little") + count).to_bytes(8, "little")
@@ -88,11 +108,12 @@ class Hasher:
 
     def _start_workers(self, job, count: int) -> None:
         self.generation += 1
+        base = secrets.randbelow((1 << 64) - count * 2) + 1
         self.worker_count = count
         self.stop_event = self.ctx.Event()
         self.reports = self.ctx.Queue()
         self.processes = [self.ctx.Process(target=_worker,
-                          args=(job, i, count, self.generation, self.stop_event, self.reports), daemon=True)
+                          args=(job, i, count, (base + i).to_bytes(8, "little"), self.stop_event, self.reports), daemon=True)
                           for i in range(count)]
         for process in self.processes:
             process.start()

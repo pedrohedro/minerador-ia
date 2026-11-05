@@ -8,6 +8,7 @@ data/
 venv/
 __pycache__/
 *.py[cod]
+minerador/_native_hash.so
 .pytest_cache/
 
 # Bitcoin Core portátil: o programa baixa e confere pelo botão "Baixar Bitcoin Core"
