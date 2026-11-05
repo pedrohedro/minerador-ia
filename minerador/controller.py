@@ -4,6 +4,7 @@ from __future__ import annotations
 import collections
 import copy
 import json
+import os
 import random
 import threading
 import time
@@ -15,7 +16,7 @@ from .ai import PROVIDERS, Copilot
 from .hasher import Hasher
 from .job import EXTRANONCE_SIZE, Job
 from .node_source import NodeSource
-from .paths import CONFIG_FILE, FOUND_FILE
+from .paths import CONFIG_FILE, FOUND_FILE, MINING_STATE_FILE
 from .public_source import API as MEMPOOL_API, PublicSource
 from .rpc import RPCClient, RPCError
 
@@ -57,13 +58,15 @@ def mask(secret: str) -> str:
 class Controller:
     def __init__(self):
         self.lock = threading.RLock()
-        self.events: collections.deque = collections.deque(maxlen=400)
+        saved = self._load_mining_state()
+        self.events: collections.deque = collections.deque(saved.get("events", []), maxlen=400)
         self.config = self._load_config()
         self.source = None
         self.current_job: Job | None = None
         self.solved_jobs: set[str] = set()
         self.found: list = self._load_found()
-        self.checked_total = 0
+        self.checked_total = saved.get("checked_total", 0)
+        self._saved_hashes = saved.get("hashes", 0)
         self.regtest = regtest.RegtestNode()
         self.copilot = Copilot(self)
         self.hasher = Hasher(self)
@@ -75,7 +78,32 @@ class Controller:
 
     # ---- registro e persistência ----
     def log(self, msg: str, level: str = "info") -> None:
-        self.events.appendleft({"quando": time.time(), "nivel": level, "msg": msg})
+        with self.lock:
+            self.events.appendleft({"quando": time.time(), "nivel": level, "msg": msg})
+            self.persist_mining_state()
+
+    @staticmethod
+    def _load_mining_state() -> dict:
+        try:
+            state = json.loads(MINING_STATE_FILE.read_text(encoding="utf-8"))
+            if (isinstance(state, dict) and isinstance(state.get("events", []), list)
+                    and all(isinstance(state.get(k, 0), int) and state.get(k, 0) >= 0
+                            for k in ("checked_total", "hashes"))):
+                return state
+        except (FileNotFoundError, json.JSONDecodeError, OSError):
+            pass
+        return {}
+
+    def persist_mining_state(self) -> None:
+        with self.lock:
+            state = {"checked_total": self.checked_total,
+                     "hashes": self.hasher.total if hasattr(self, "hasher") else self._saved_hashes,
+                     "events": list(self.events)}
+            temporary = MINING_STATE_FILE.with_suffix(".tmp")
+            fd = os.open(temporary, os.O_CREAT | os.O_WRONLY | os.O_TRUNC, 0o600)
+            with os.fdopen(fd, "w", encoding="utf-8") as stream:
+                json.dump(state, stream, ensure_ascii=False)
+            os.replace(temporary, MINING_STATE_FILE)
 
     def _load_config(self) -> dict:
         try:
