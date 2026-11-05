@@ -85,9 +85,10 @@ class Hasher:
         self.job_id = None
         self.worker_count = 0
         self.generation = 0
-        self.total = 0
+        self.total = controller._saved_hashes
         self.started = time.monotonic()
-        self.last_count = 0
+        self.last_count = self.total
+        self.last_persist = time.monotonic()
         self.rate = 0.0
         self._quit = threading.Event()
         threading.Thread(target=self._loop, daemon=True, name="hash-manager").start()
@@ -154,7 +155,11 @@ class Hasher:
                 self.rate = (self.total - self.last_count) / elapsed
                 self.last_count = self.total
                 self.started = time.monotonic()
+            if time.monotonic() - self.last_persist >= 10:
+                self.ctrl.persist_mining_state()
+                self.last_persist = time.monotonic()
         self._stop_workers()
+        self.ctrl.persist_mining_state()
 
     def status(self) -> dict:
         desired, period = worker_schedule(self.ctrl.config.get("hashing_noturno", False))
